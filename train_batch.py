@@ -62,7 +62,10 @@ def train_epoch_progress(model, train_iter, loss_function, optimizer, text_field
         model.batch_size = len(label.data)
         model.hidden = model.init_hidden()
         pred = model(sent)
-        pred_label = pred.data.max(1)[1].numpy()
+        if USE_GPU:
+            pred_label = pred.data.max(1)[1].cpu().numpy()
+        else:
+            pred_label = pred.data.max(1)[1].numpy()
         pred_res += [x for x in pred_label]
         model.zero_grad()
         loss = loss_function(pred, label)
@@ -88,7 +91,10 @@ def train_epoch(model, train_iter, loss_function, optimizer):
         model.batch_size = len(label.data)
         model.hidden = model.init_hidden()
         pred = model(sent)
-        pred_label = pred.data.max(1)[1].numpy()
+        if USE_GPU:
+            pred_label = pred.data.max(1)[1].cpu().numpy()
+        else:
+            pred_label = pred.data.max(1)[1].numpy()
         pred_res += [x for x in pred_label]
         model.zero_grad()
         loss = loss_function(pred, label)
@@ -113,7 +119,10 @@ def evaluate(model, data, loss_function, name):
         model.batch_size = len(label.data)
         model.hidden = model.init_hidden()
         pred = model(sent)
-        pred_label = pred.data.max(1)[1].numpy()
+        if USE_GPU:
+            pred_label = pred.data.max(1)[1].cpu().numpy()
+        else:
+            pred_label = pred.data.max(1)[1].numpy()
         pred_res += [x for x in pred_label]
         loss = loss_function(pred, label)
         avg_loss += loss.data[0]
@@ -123,14 +132,15 @@ def evaluate(model, data, loss_function, name):
     return acc
 
 
-def load_sst(text_field, label_field, batch_size):
+def load_sst(text_field, label_field, batch_size, use_gpu=True):
     train, dev, test = data.TabularDataset.splits(path='./data/SST2/', train='train.tsv',
                                                   validation='dev.tsv', test='test.tsv', format='tsv',
                                                   fields=[('text', text_field), ('label', label_field)])
     text_field.build_vocab(train, dev, test)
     label_field.build_vocab(train, dev, test)
     train_iter, dev_iter, test_iter = data.BucketIterator.splits((train, dev, test),
-                batch_sizes=(batch_size, len(dev), len(test)), sort_key=lambda x: len(x.text), repeat=False, device=-1)
+                                                                 batch_sizes=(batch_size, len(dev), len(test)), sort_key=lambda x: len(x.text), repeat=False,
+                                                                 device=0 if use_gpu else -1)
     return train_iter, dev_iter, test_iter
 
 
@@ -157,9 +167,9 @@ best_dev_acc = 0.0
 
 text_field = data.Field(lower=True)
 label_field = data.Field(sequential=False)
-train_iter, dev_iter, test_iter = load_sst(text_field, label_field, BATCH_SIZE)
+train_iter, dev_iter, test_iter = load_sst(text_field, label_field, BATCH_SIZE, USE_GPU)
 
-if not args.model:
+if not args.model or args.model == 'lstm':
     model = LSTMSentiment(embedding_dim=EMBEDDING_DIM, hidden_dim=HIDDEN_DIM, vocab_size=len(text_field.vocab), label_size=len(label_field.vocab)-1,\
                           use_gpu=USE_GPU, batch_size=BATCH_SIZE)
 

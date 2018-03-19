@@ -28,6 +28,8 @@ class LSTMSentiment(nn.Module):
                     Variable(torch.zeros(1, self.batch_size, self.hidden_dim)))
 
     def forward(self, sentence):
+        if self.use_gpu:
+            sentence = sentence.cuda()
         x = self.embeddings(sentence).view(len(sentence), self.batch_size, -1)
         lstm_out, self.hidden = self.lstm(x, self.hidden)
         y = self.hidden2label(lstm_out[-1])
